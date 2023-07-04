@@ -1,25 +1,29 @@
 ﻿using DirectorySupervisorSpike.App.configuration;
 using Microsoft.Extensions.FileSystemGlobbing;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Serilog.Core;
 
 namespace DirectorySupervisorSpike.App
 {
     internal class Worker
     {
+        private readonly ILogger<Worker> logger;
         private readonly IOptions<DirectorySupervisorOptions> directorySupervisorOptions;
 
-        public Worker(IOptions<DirectorySupervisorOptions> directorySupervisorOptions)
+        public Worker(
+            ILogger<Worker> logger,
+            IOptions<DirectorySupervisorOptions> directorySupervisorOptions)
         {
+            this.logger = logger;
             this.directorySupervisorOptions = directorySupervisorOptions;
         }
 
         public void Execute()
         {
-
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("==============================================");
-            Console.WriteLine("DirectorySupervisor configurations...");
-            Console.WriteLine("==============================================");
+            logger.LogInformation("==============================================");
+            logger.LogInformation("DirectorySupervisor configurations...");
+            logger.LogInformation("==============================================");
 
             // var keyValuePairs = configuration.AsEnumerable().ToList();
             //foreach (var pair in keyValuePairs)
@@ -43,12 +47,11 @@ namespace DirectorySupervisorSpike.App
             {
                 if (!Directory.Exists(directory.Path))
                 {
-                    Console.WriteLine($"Base directory path: '{directory.Path}' not found.");
+                    logger.LogWarning($"Base directory path: '{directory.Path}' not found.");
                     continue;
                 }
 
-                Console.WriteLine($"Base directory path: '{directory.Path}'");
-                Console.WriteLine(" include pattern:");
+                logger.LogInformation($"Base directory path: '{directory.Path}'");
 
                 /* iterate first level of directories */
 
@@ -56,41 +59,39 @@ namespace DirectorySupervisorSpike.App
 
                 foreach (string sstDirectory in sstDirectories)
                 {
-                    Console.WriteLine("");
-                    Console.WriteLine($" use sst directory: '{sstDirectory}'");
+                    logger.LogInformation($"--------------------------------------------------");
+                    logger.LogInformation($"use sst directory: '{sstDirectory}'");
 
+                    logger.LogDebug("include pattern:");
                     matcher.AddIncludePatterns(options.GlobalIncludePatterns);
                     matcher.AddIncludePatterns(directory.IncludePatterns);
                     foreach (var includePattern in directory.IncludePatterns)
                     {
-                        Console.WriteLine($" - {includePattern}");
+                        logger.LogDebug($" - {includePattern}");
                     }
-                    Console.WriteLine(" exclude pattern:");
+
+                    logger.LogDebug("exclude pattern:");
                     matcher.AddExcludePatterns(options.GlobalExcludePatterns);
                     matcher.AddExcludePatterns(directory.ExcludePatterns);
                     foreach (var excludePattern in directory.ExcludePatterns)
                     {
-                        Console.WriteLine($" - {excludePattern}");
+                        logger.LogDebug($" - {excludePattern}");
                     }
 
-                    patternMatchingResults.AddRange(matcher.GetResultsInFullPath(sstDirectory));
+                    var results = matcher.GetResultsInFullPath(sstDirectory);
+                    logger.LogInformation($"found {results.Count()} file(s).");
+
+                    patternMatchingResults.AddRange(results);
 
                 }
             }
 
-            Console.ResetColor();
-
-            Console.ForegroundColor = ConsoleColor.Blue;
-
-            Console.WriteLine("");
-            Console.WriteLine("Found Paths:");
+            logger.LogInformation("");
+            logger.LogInformation($"Found Paths: {patternMatchingResults.Count} file(s).");
             foreach (var patternMatchingResultFile in patternMatchingResults)
             {
-                Console.WriteLine($" - {patternMatchingResultFile}");
+                logger.LogDebug($" - {patternMatchingResultFile}");
             }
-
-            Console.ResetColor();
-
         }
     }
 }
