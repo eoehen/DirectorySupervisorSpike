@@ -1,4 +1,5 @@
 ﻿using DirectorySupervisorSpike.App.configuration;
+using DirectorySupervisorSpike.App.hashData;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -12,7 +13,7 @@ namespace DirectorySupervisorSpike.App
         {
         }
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             Log.Logger = new LoggerConfiguration()  // initiate the logger configuration
                 .ReadFrom.AppSettings()             // Connect serilog to our configuration folder
@@ -24,7 +25,7 @@ namespace DirectorySupervisorSpike.App
             using var serviceScope = host.Services.CreateScope();
             var provider = serviceScope.ServiceProvider;
             var workerInstance = provider.GetRequiredService<Worker>();
-            workerInstance.Execute();
+            workerInstance.ExecuteAsync();
             host.Run();
         }
 
@@ -37,8 +38,10 @@ namespace DirectorySupervisorSpike.App
                 })
                 .ConfigureServices((context, services) =>
                 {
-                    services.AddSingleton<Worker>();
                     services.Configure<DirectorySupervisorOptions>(context.Configuration.GetSection("DirectorySupervisor"));
+                    services.AddSingleton<Worker>();
+                    services.AddSingleton<IDirectoryHashBuilder, DirectoryHashBuilder>();
+                    services.AddSingleton<IHashDataManager, HashDataManager>();
                 })
                 .UseSerilog()
                 ;

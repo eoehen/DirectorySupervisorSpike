@@ -1,4 +1,5 @@
 ﻿using DirectorySupervisorSpike.App.configuration;
+using DirectorySupervisorSpike.App.hashData;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -10,31 +11,39 @@ namespace DirectorySupervisorSpike.App
     {
         private readonly ILogger<Worker> logger;
         private readonly IOptions<DirectorySupervisorOptions> directorySupervisorOptions;
+        private readonly IHashDataManager hashDataManager;
+        private readonly IDirectoryHashBuilder hashBuilder;
 
         public Worker(
             ILogger<Worker> logger,
-            IOptions<DirectorySupervisorOptions> directorySupervisorOptions)
+            IOptions<DirectorySupervisorOptions> directorySupervisorOptions,
+            IHashDataManager hashDataManager,
+            IDirectoryHashBuilder hashBuilder)
         {
             this.logger = logger;
             this.directorySupervisorOptions = directorySupervisorOptions;
+            this.hashDataManager = hashDataManager;
+            this.hashBuilder = hashBuilder;
         }
 
-        public void Execute()
+        public async Task ExecuteAsync()
         {
             logger.LogInformation("==============================================");
             logger.LogInformation("DirectorySupervisor configurations...");
             logger.LogInformation("==============================================");
 
-            // var keyValuePairs = configuration.AsEnumerable().ToList();
-            //foreach (var pair in keyValuePairs)
-            //{
-            //    Console.WriteLine($"{pair.Key} - {pair.Value}");
-            //}
-            //Console.WriteLine("==============================================");
-            //Console.ResetColor();
+            var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+            while (await timer.WaitForNextTickAsync())
+            {
+                SuperviseDirectory();
+            }
+        }
 
+        private void SuperviseDirectory()
+        {
             var options = directorySupervisorOptions?.Value;
             if (options == null) { return; }
+
 
             var patternMatchingResults = new List<string>();
 
@@ -53,12 +62,31 @@ namespace DirectorySupervisorSpike.App
 
                 logger.LogInformation($"Base directory path: '{directory.Path}'");
 
+                var directorySupervisorData = this.hashDataManager.LoadJsonFile(directory.Path);
+
                 /* iterate first level of directories */
 
                 string[] sstDirectories = Directory.GetDirectories(directory.Path);
 
                 foreach (string sstDirectory in sstDirectories)
                 {
+                    var directoryHashData =
+                        directorySupervisorData.DirectoryHashData
+                        .SingleOrDefault(d => d.DirectoryName == sstDirectory);
+
+                    if (directoryHashData == null)
+                    {
+                        directoryHashData = new DirectoryHashData();
+                        directoryHashData.DirectoryName = sstDirectory;
+                        directorySupervisorData.DirectoryHashData.Add(directoryHashData);
+                    }
+
+                    if (directoryHashData.ImportPending)
+                    {
+                        logger.LogInformation($"Import for '{sstDirectory}' is pending.");
+                        continue;
+                    }
+
                     logger.LogInformation($"--------------------------------------------------");
                     logger.LogInformation($"use sst directory: '{sstDirectory}'");
 
@@ -78,12 +106,34 @@ namespace DirectorySupervisorSpike.App
                         logger.LogDebug($" - {excludePattern}");
                     }
 
-                    var results = matcher.GetResultsInFullPath(sstDirectory);
-                    logger.LogInformation($"found {results.Count()} file(s).");
+                    var results = matcher.GetResultsInFullPath(sstDirectory).ToList();
+                    logger.LogInformation($"found {results.Count} file(s).");
+
+                    var sstDirectoryHash = this.hashBuilder.Build(sstDirectory, results);
+                    logger.LogInformation($"directory hash '{sstDirectoryHash}'");
+
+                    if (directoryHashData.LastDirectoryHash == null || !directoryHashData.LastDirectoryHash.Equals(sstDirectoryHash))
+                    {
+                        directoryHashData.LastDirectoryHash = sstDirectoryHash;
+                        directoryHashData.LastDirectoryHashDifferentSince = DateTime.Now;
+                    }
+
+                    if (directoryHashData.CurrentDirectoryHash == null || !directoryHashData.LastDirectoryHash.Equals(directoryHashData.CurrentDirectoryHash))
+                    {
+                        // No LastDirectoryHash change for 1 min
+                        if (directoryHashData.LastDirectoryHashDifferentSince < DateTime.Now.AddMinutes(-1))
+                        {
+                            directoryHashData.CurrentDirectoryHash = directoryHashData.LastDirectoryHash;
+                            directoryHashData.ImportPending = true;
+                        }
+                    }
+
+                    directoryHashData.LastHashCheck = DateTime.Now;
 
                     patternMatchingResults.AddRange(results);
-
                 }
+
+                this.hashDataManager.WriteJsonFile(directory.Path, directorySupervisorData);
             }
 
             logger.LogInformation("");
