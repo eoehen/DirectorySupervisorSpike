@@ -2,11 +2,11 @@
 {
     public class DirectoryHashData
     {
-        public string DirectoryName { get; }
+        public string DirectoryPath { get; }
 
-        public DirectoryHashData(string directoryName)
+        public DirectoryHashData(string directoryPath)
         {
-            DirectoryName = directoryName;
+            DirectoryPath = directoryPath;
         }
 
         public string? LastDirectoryHash { get; set; }

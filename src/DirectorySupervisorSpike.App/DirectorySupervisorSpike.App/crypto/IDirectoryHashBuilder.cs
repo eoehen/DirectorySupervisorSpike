@@ -1,4 +1,4 @@
-﻿namespace DirectorySupervisorSpike.App
+﻿namespace DirectorySupervisorSpike.App.crypto
 {
     internal interface IDirectoryHashBuilder
     {

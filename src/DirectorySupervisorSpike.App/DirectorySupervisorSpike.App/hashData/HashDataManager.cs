@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using oehen.arguard;
 
 namespace DirectorySupervisorSpike.App.hashData
@@ -9,6 +10,12 @@ namespace DirectorySupervisorSpike.App.hashData
 
         private static readonly JsonSerializerSettings jsonSerializerSettings
             = new() { NullValueHandling = NullValueHandling.Ignore, Formatting = Formatting.Indented };
+        private readonly ILogger<HashDataManager> logger;
+
+        public HashDataManager(ILogger<HashDataManager> logger)
+        {
+            this.logger = logger;
+        }
 
         public async Task<DirectorySupervisorData> LoadJsonFileAsync(string baseDirectory)
         {
@@ -46,6 +53,38 @@ namespace DirectorySupervisorSpike.App.hashData
             await File.WriteAllTextAsync(directorySupervisorDataFullPath, jsonString);
         }
 
+        public void EvaluateAndUpdateDirectoryHash(DirectoryHashData directoryHashData, string sstDirectoryHash)
+        {
+            directoryHashData.ThrowIfNull(nameof(directoryHashData));
+            sstDirectoryHash.ThrowIfNull(nameof(sstDirectoryHash));
+
+            directoryHashData.LastHashCheck = DateTime.Now;
+
+            if (directoryHashData.LastDirectoryHash == null || !directoryHashData.LastDirectoryHash.Equals(sstDirectoryHash))
+            {
+                directoryHashData.LastDirectoryHash = sstDirectoryHash;
+                directoryHashData.LastDirectoryHashDifferentSince = DateTime.Now;
+
+                logger.LogWarning($"different directory hash detected {directoryHashData.DirectoryPath}");
+            }
+
+            if (directoryHashData.CurrentDirectoryHash == null || !directoryHashData.LastDirectoryHash.Equals(directoryHashData.CurrentDirectoryHash))
+            {
+                // No LastDirectoryHash change for 1 min
+                if (directoryHashData.LastDirectoryHashDifferentSince < DateTime.Now.AddMinutes(-1))
+                {
+                    directoryHashData.CurrentDirectoryHash = directoryHashData.LastDirectoryHash;
+                    directoryHashData.ImportPending = true;
+
+                    logger.LogError($"--> enque import {directoryHashData.DirectoryPath}");
+
+                    directoryHashData.ImportPending = false;
+
+                    // TODO enqueue import!!
+                }
+            }
+        }
+
         private void SyncDirectories(string baseDirectory, DirectorySupervisorData directorySupervisorData)
         {
             var sstDirectories = Directory.GetDirectories(baseDirectory).Where(d => Directory.Exists(d)).ToArray();
@@ -55,16 +94,16 @@ namespace DirectorySupervisorSpike.App.hashData
 
         private static void RemoveNotExistingDirectories(DirectorySupervisorData directorySupervisorData, string[] sstDirectories)
         {
-            directorySupervisorData.DirectoryHashData
+            directorySupervisorData.DirectoryHashDatas
                 .RemoveAll(dh => 
-                directorySupervisorData.DirectoryHashData
-                    .Select(d => d.DirectoryName).Except(sstDirectories).ToList().Contains(dh.DirectoryName));
+                directorySupervisorData.DirectoryHashDatas
+                    .Select(d => d.DirectoryPath).Except(sstDirectories).ToList().Contains(dh.DirectoryPath));
         }
 
         private static void AppendMissingDirectories(DirectorySupervisorData directorySupervisorData, string[] sstDirectories)
         {
-            directorySupervisorData.DirectoryHashData.AddRange(
-                sstDirectories.Except(directorySupervisorData.DirectoryHashData.Select(d => d.DirectoryName))
+            directorySupervisorData.DirectoryHashDatas.AddRange(
+                sstDirectories.Except(directorySupervisorData.DirectoryHashDatas.Select(d => d.DirectoryPath))
                 .Select(md => new DirectoryHashData(md)));
         }
     }

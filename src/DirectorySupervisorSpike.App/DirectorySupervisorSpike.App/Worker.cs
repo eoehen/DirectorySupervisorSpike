@@ -1,11 +1,11 @@
 ﻿using DirectorySupervisorSpike.App.configuration;
+using DirectorySupervisorSpike.App.crypto;
 using DirectorySupervisorSpike.App.filesystem;
 using DirectorySupervisorSpike.App.hashData;
 using DirectorySupervisorSpike.App.performance;
-using Microsoft.Extensions.FileSystemGlobbing;
+using Figgle;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Diagnostics;
 
 namespace DirectorySupervisorSpike.App
 {
@@ -13,34 +13,36 @@ namespace DirectorySupervisorSpike.App
     {
         private readonly ILogger<Worker> logger;
         private readonly IOptions<DirectorySupervisorOptions> directorySupervisorOptions;
-        private readonly IDirectoryParser directoryParser;
+        private readonly ISstDirectoryHashCalculator sstDirectoryHashCalculator;
         private readonly IHashDataManager hashDataManager;
-        private readonly IDirectoryHashBuilder hashBuilder;
 
         public Worker(
             ILogger<Worker> logger,
             IOptions<DirectorySupervisorOptions> directorySupervisorOptions,
+            ISstDirectoryHashCalculator sstDirectoryHashCalculator,
             IDirectoryParser directoryParser,
             IHashDataManager hashDataManager,
             IDirectoryHashBuilder hashBuilder)
         {
             this.logger = logger;
             this.directorySupervisorOptions = directorySupervisorOptions;
-            this.directoryParser = directoryParser;
+            this.sstDirectoryHashCalculator = sstDirectoryHashCalculator;
             this.hashDataManager = hashDataManager;
-            this.hashBuilder = hashBuilder;
         }
 
         public async Task ExecuteAsync()
         {
-            logger.LogInformation("==============================================");
-            logger.LogInformation(" Start DirectorySupervisor");
-            logger.LogInformation("==============================================");
+            Console.WriteLine(FiggleFonts.Standard.Render("exanic"));
+            Console.WriteLine(FiggleFonts.Standard.Render("DirectorySupervisor"));
+
+            await SuperviseDirectoryAsync();
+            Console.WriteLine("... next check in 10 seconds.");
 
             var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
             while (await timer.WaitForNextTickAsync())
             {
                 await SuperviseDirectoryAsync();
+                Console.WriteLine("... next check in 10 seconds.");
             }
         }
 
@@ -56,80 +58,29 @@ namespace DirectorySupervisorSpike.App
             {
                 var directoryTimepiece = Timepiece.StartNew();
 
-                var directorySupervisorData = await this.hashDataManager
+                var directorySupervisorData = await hashDataManager
                     .LoadJsonFileAsync(directoryOptions.Path)
                     .ConfigureAwait(false);
 
-                /* iterate first level of directories */
-
-                string[] sstDirectories = Directory.GetDirectories(directoryOptions.Path);
-
-                foreach (string sstDirectory in sstDirectories)
+                foreach (var directoryHashData in directorySupervisorData.DirectoryHashDatas)
                 {
-                    var directoryHashData =
-                        directorySupervisorData.DirectoryHashData
-                        .SingleOrDefault(d => d.DirectoryName == sstDirectory);
-
-                    if (directoryHashData == null)
-                    {
-                        directoryHashData = new DirectoryHashData(sstDirectory);
-                        directorySupervisorData.DirectoryHashData.Add(directoryHashData);
-                    }
-
-                    if (directoryHashData.ImportPending)
-                    {
-                        logger.LogWarning($"Import for '{sstDirectory}' is pending.");
-                        continue;
-                    }
-
                     var sstDirTimepiece = Timepiece.StartNew();
 
-                    // Read all Files in directory
-                    List<string> directoryFiles = directoryParser.ParseDirectoryFiles(sstDirectory, directoryOptions);
-
-                    // Create hash for all files in directory
-                    var sstDirectoryHash = await hashBuilder.BuildDirectoryHashAsync(sstDirectory, directoryFiles)
+                    // Calc directory hash
+                    var sstDirectoryHash = 
+                        await sstDirectoryHashCalculator.CalcDirectoryHashAsync(directoryOptions, directoryHashData)
                         .ConfigureAwait(false);
 
-                    logger.LogDebug($"directory hash '{sstDirectoryHash}'");
-
-
                     // Evaluate and update directory hash data
-                    if (directoryHashData.LastDirectoryHash == null || !directoryHashData.LastDirectoryHash.Equals(sstDirectoryHash))
-                    {
-                        directoryHashData.LastDirectoryHash = sstDirectoryHash;
-                        directoryHashData.LastDirectoryHashDifferentSince = DateTime.Now;
+                    hashDataManager.EvaluateAndUpdateDirectoryHash(directoryHashData, sstDirectoryHash);
 
-                        logger.LogWarning($"different directory hash detected {directoryHashData.DirectoryName}");
-                    }
+                    await hashDataManager.WriteJsonFileAsync(directoryOptions.Path, directorySupervisorData).ConfigureAwait(false);
 
-                    if (directoryHashData.CurrentDirectoryHash == null || !directoryHashData.LastDirectoryHash.Equals(directoryHashData.CurrentDirectoryHash))
-                    {
-                        // No LastDirectoryHash change for 1 min
-                        if (directoryHashData.LastDirectoryHashDifferentSince < DateTime.Now.AddMinutes(-1))
-                        {
-                            directoryHashData.CurrentDirectoryHash = directoryHashData.LastDirectoryHash;
-                            directoryHashData.ImportPending = true;
-
-                            logger.LogError($"--> enque import {directoryHashData.DirectoryName}");
-
-                            directoryHashData.ImportPending = false;
-
-                            // TODO enqueue import!!
-                        }
-                    }
-
-                    directoryHashData.LastHashCheck = DateTime.Now;
-
-                    logger.LogDebug($"SST directory path: '{sstDirectory}' elapsed {sstDirTimepiece.GetElapsedTime()}");
+                    logger.LogDebug($"SST directory path: '{directoryHashData.DirectoryPath}' elapsed {sstDirTimepiece.GetElapsedTime()}");
                 }
 
-                await this.hashDataManager.WriteJsonFileAsync(directoryOptions.Path, directorySupervisorData).ConfigureAwait(false);
-
-                logger.LogInformation($"Directory path: '{directoryOptions.Path}' elapsed {directoryTimepiece.GetElapsedTime()}");
+                logger.LogInformation($"Directory hash checked '{directoryOptions.Path}' elapsed {directoryTimepiece.GetElapsedTime()}");
             }
         }
-
-
     }
 }

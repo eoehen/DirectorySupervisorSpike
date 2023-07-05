@@ -1,7 +1,7 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
 
-namespace DirectorySupervisorSpike.App
+namespace DirectorySupervisorSpike.App.crypto
 {
     internal class DirectoryHashBuilder : IDirectoryHashBuilder
     {
@@ -54,10 +54,13 @@ namespace DirectorySupervisorSpike.App
         private static async Task<byte[]> ReadAllBytesAsync(string fileName)
         {
             byte[]? buffer = null;
-            using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read))
+            if (File.Exists(fileName))
             {
-                buffer = new byte[fs.Length];
-                _ = await fs.ReadAsync(buffer, 0, (int)fs.Length).ConfigureAwait(false);
+                using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read))
+                {
+                    buffer = new byte[fs.Length];
+                    _ = await fs.ReadAsync(buffer, 0, (int)fs.Length).ConfigureAwait(false);
+                }
             }
             return buffer;
         }

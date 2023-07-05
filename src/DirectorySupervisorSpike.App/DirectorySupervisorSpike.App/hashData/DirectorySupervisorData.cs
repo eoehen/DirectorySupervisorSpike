@@ -2,6 +2,6 @@
 {
     internal class DirectorySupervisorData
     {
-        public List<DirectoryHashData> DirectoryHashData { get; } = new List<DirectoryHashData>();
+        public List<DirectoryHashData> DirectoryHashDatas { get; } = new List<DirectoryHashData>();
     }
 }
