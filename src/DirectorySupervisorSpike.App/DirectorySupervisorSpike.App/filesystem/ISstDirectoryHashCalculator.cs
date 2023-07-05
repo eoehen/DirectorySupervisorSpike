@@ -5,6 +5,6 @@ namespace DirectorySupervisorSpike.App.filesystem
 {
     internal interface ISstDirectoryHashCalculator
     {
-        Task<string> CalcDirectoryHashAsync(DirectorySupervisorDirOptions directoryOptions, DirectoryHashData directoryHashData);
+        Task<string> CalcDirectoryHashAsync(DirectorySupervisorDirOptions directoryOptions, DirectoryHashData directoryHashData, CancellationToken cancellationToken = default);
     }
 }

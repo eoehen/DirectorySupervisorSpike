@@ -17,7 +17,7 @@ namespace DirectorySupervisorSpike.App.filesystem
             this.hashBuilder = hashBuilder;
         }
 
-        public async Task<string> CalcDirectoryHashAsync(DirectorySupervisorDirOptions directoryOptions, DirectoryHashData directoryHashData)
+        public async Task<string> CalcDirectoryHashAsync(DirectorySupervisorDirOptions directoryOptions, DirectoryHashData directoryHashData, CancellationToken cancellationToken = default)
         {
             // Read all Files in directory
             List<string> directoryFiles = directoryParser

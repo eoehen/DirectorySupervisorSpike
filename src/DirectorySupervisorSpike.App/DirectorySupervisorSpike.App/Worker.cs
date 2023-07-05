@@ -1,5 +1,4 @@
 ﻿using DirectorySupervisorSpike.App.configuration;
-using DirectorySupervisorSpike.App.crypto;
 using DirectorySupervisorSpike.App.filesystem;
 using DirectorySupervisorSpike.App.hashData;
 using DirectorySupervisorSpike.App.performance;
@@ -20,9 +19,7 @@ namespace DirectorySupervisorSpike.App
             ILogger<Worker> logger,
             IOptions<DirectorySupervisorOptions> directorySupervisorOptions,
             ISstDirectoryHashCalculator sstDirectoryHashCalculator,
-            IDirectoryParser directoryParser,
-            IHashDataManager hashDataManager,
-            IDirectoryHashBuilder hashBuilder)
+            IHashDataManager hashDataManager)
         {
             this.logger = logger;
             this.directorySupervisorOptions = directorySupervisorOptions;
@@ -30,23 +27,24 @@ namespace DirectorySupervisorSpike.App
             this.hashDataManager = hashDataManager;
         }
 
-        public async Task ExecuteAsync()
+        public async Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
             Console.WriteLine(FiggleFonts.Standard.Render("exanic"));
             Console.WriteLine(FiggleFonts.Standard.Render("DirectorySupervisor"));
 
-            await SuperviseDirectoryAsync();
+            await SuperviseDirectoryAsync(cancellationToken);
             Console.WriteLine("... next check in 10 seconds.");
 
             var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
-            while (await timer.WaitForNextTickAsync())
+            while (await timer.WaitForNextTickAsync(cancellationToken))
             {
                 await SuperviseDirectoryAsync();
                 Console.WriteLine("... next check in 10 seconds.");
+                cancellationToken.ThrowIfCancellationRequested();
             }
         }
 
-        private async Task SuperviseDirectoryAsync()
+        private async Task SuperviseDirectoryAsync(CancellationToken cancellationToken = default)
         {
             var options = directorySupervisorOptions?.Value;
             if (options == null) { return; }
@@ -56,6 +54,8 @@ namespace DirectorySupervisorSpike.App
 
             foreach (var directoryOptions in directories)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 var directoryTimepiece = Timepiece.StartNew();
 
                 var directorySupervisorData = await hashDataManager
@@ -64,17 +64,20 @@ namespace DirectorySupervisorSpike.App
 
                 foreach (var directoryHashData in directorySupervisorData.DirectoryHashDatas)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     var sstDirTimepiece = Timepiece.StartNew();
 
                     // Calc directory hash
                     var sstDirectoryHash = 
-                        await sstDirectoryHashCalculator.CalcDirectoryHashAsync(directoryOptions, directoryHashData)
+                        await sstDirectoryHashCalculator.CalcDirectoryHashAsync(directoryOptions, directoryHashData, cancellationToken)
                         .ConfigureAwait(false);
 
                     // Evaluate and update directory hash data
                     hashDataManager.EvaluateAndUpdateDirectoryHash(directoryHashData, sstDirectoryHash);
 
-                    await hashDataManager.WriteJsonFileAsync(directoryOptions.Path, directorySupervisorData).ConfigureAwait(false);
+                    await hashDataManager.WriteJsonFileAsync(directoryOptions.Path, directorySupervisorData, cancellationToken)
+                        .ConfigureAwait(false);
 
                     logger.LogDebug($"SST directory path: '{directoryHashData.DirectoryPath}' elapsed {sstDirTimepiece.GetElapsedTime()}");
                 }

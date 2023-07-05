@@ -17,20 +17,20 @@ namespace DirectorySupervisorSpike.App.hashData
             this.logger = logger;
         }
 
-        public async Task<DirectorySupervisorData> LoadJsonFileAsync(string baseDirectory)
+        public async Task<DirectorySupervisorData> LoadJsonFileAsync(string baseDirectory, CancellationToken cancellationToken = default)
         {
             var directorySupervisorDataFullPath =
                 Path.Combine(baseDirectory, directorySupervisorDataFileName);
 
             if (!File.Exists(directorySupervisorDataFullPath))
             {
-                await WriteJsonFileAsync(baseDirectory, new DirectorySupervisorData());
+                await WriteJsonFileAsync(baseDirectory, new DirectorySupervisorData(), cancellationToken);
             }
 
             var directorySupervisorData = ReadJsonFile(directorySupervisorDataFullPath);
 
             SyncDirectories(baseDirectory, directorySupervisorData);
-            await WriteJsonFileAsync(baseDirectory, directorySupervisorData);
+            await WriteJsonFileAsync(baseDirectory, directorySupervisorData, cancellationToken);
 
             return directorySupervisorData;
         }
@@ -44,13 +44,13 @@ namespace DirectorySupervisorSpike.App.hashData
             return JsonConvert.DeserializeObject<DirectorySupervisorData>(json) ?? new DirectorySupervisorData();
         }
 
-        public async Task WriteJsonFileAsync(string baseDirectory, DirectorySupervisorData directorySupervisorData)
+        public async Task WriteJsonFileAsync(string baseDirectory, DirectorySupervisorData directorySupervisorData, CancellationToken cancellationToken = default)
         {
             var directorySupervisorDataFullPath =
                 Path.Combine(baseDirectory, directorySupervisorDataFileName);
 
             var jsonString = JsonConvert.SerializeObject(directorySupervisorData, jsonSerializerSettings);
-            await File.WriteAllTextAsync(directorySupervisorDataFullPath, jsonString);
+            await File.WriteAllTextAsync(directorySupervisorDataFullPath, jsonString, cancellationToken);
         }
 
         public void EvaluateAndUpdateDirectoryHash(DirectoryHashData directoryHashData, string sstDirectoryHash)
