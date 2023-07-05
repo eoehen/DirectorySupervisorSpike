@@ -1,10 +1,10 @@
 ﻿using DirectorySupervisorSpike.App.configuration;
 using DirectorySupervisorSpike.App.hashData;
+using DirectorySupervisorSpike.App.performance;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Serilog.Core;
-using System.Formats.Asn1;
+using System.Diagnostics;
 
 namespace DirectorySupervisorSpike.App
 {
@@ -30,7 +30,7 @@ namespace DirectorySupervisorSpike.App
         public async Task ExecuteAsync()
         {
             logger.LogInformation("==============================================");
-            logger.LogInformation("DirectorySupervisor configurations...");
+            logger.LogInformation(" Start DirectorySupervisor");
             logger.LogInformation("==============================================");
 
             var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
@@ -45,11 +45,6 @@ namespace DirectorySupervisorSpike.App
             var options = directorySupervisorOptions?.Value;
             if (options == null) { return; }
 
-
-            var patternMatchingResults = new List<string>();
-
-            Matcher matcher = new();
-
             var directories = options.Directories
                 .Where(x => !string.IsNullOrWhiteSpace(x.Path)).ToList();
 
@@ -61,9 +56,12 @@ namespace DirectorySupervisorSpike.App
                     continue;
                 }
 
-                logger.LogInformation($"Base directory path: '{directory.Path}'");
+                logger.LogDebug($"Scan directory path: '{directory.Path}'");
 
-                var directorySupervisorData = await this.hashDataManager.LoadJsonFileAsync(directory.Path);
+                var directoryTimepiece = Timepiece.StartNew();
+
+                var directorySupervisorData = await this.hashDataManager.LoadJsonFileAsync(directory.Path)
+                    .ConfigureAwait(false);
 
                 /* iterate first level of directories */
 
@@ -84,12 +82,13 @@ namespace DirectorySupervisorSpike.App
 
                     if (directoryHashData.ImportPending)
                     {
-                        logger.LogInformation($"Import for '{sstDirectory}' is pending.");
+                        logger.LogWarning($"Import for '{sstDirectory}' is pending.");
                         continue;
                     }
 
-                    logger.LogInformation($"--------------------------------------------------");
-                    logger.LogInformation($"use sst directory: '{sstDirectory}'");
+                    var sstDirTimepiece = Timepiece.StartNew();
+
+                    Matcher matcher = new();
 
                     logger.LogDebug("include pattern:");
                     matcher.AddIncludePatterns(options.GlobalIncludePatterns);
@@ -108,15 +107,18 @@ namespace DirectorySupervisorSpike.App
                     }
 
                     var results = matcher.GetResultsInFullPath(sstDirectory).ToList();
-                    logger.LogInformation($"found {results.Count} file(s).");
+                    logger.LogDebug($"found {results.Count} file(s).");
 
-                    var sstDirectoryHash = this.hashBuilder.Build(sstDirectory, results);
-                    logger.LogInformation($"directory hash '{sstDirectoryHash}'");
+                    var sstDirectoryHash = await hashBuilder.BuildAsync(sstDirectory, results).ConfigureAwait(false);
+
+                    logger.LogDebug($"directory hash '{sstDirectoryHash}'");
 
                     if (directoryHashData.LastDirectoryHash == null || !directoryHashData.LastDirectoryHash.Equals(sstDirectoryHash))
                     {
                         directoryHashData.LastDirectoryHash = sstDirectoryHash;
                         directoryHashData.LastDirectoryHashDifferentSince = DateTime.Now;
+
+                        logger.LogWarning($"different directory hash detected {directoryHashData.DirectoryName}");
                     }
 
                     if (directoryHashData.CurrentDirectoryHash == null || !directoryHashData.LastDirectoryHash.Equals(directoryHashData.CurrentDirectoryHash))
@@ -126,22 +128,23 @@ namespace DirectorySupervisorSpike.App
                         {
                             directoryHashData.CurrentDirectoryHash = directoryHashData.LastDirectoryHash;
                             directoryHashData.ImportPending = true;
+
+                            logger.LogError($"--> enque import {directoryHashData.DirectoryName}");
+
+                            directoryHashData.ImportPending = false;
+
+                            // TODO enqueue import!!
                         }
                     }
 
                     directoryHashData.LastHashCheck = DateTime.Now;
 
-                    patternMatchingResults.AddRange(results);
+                    logger.LogDebug($"SST directory path: '{sstDirectory}' elapsed {sstDirTimepiece.GetElapsedTime()}");
                 }
 
-                await this.hashDataManager.WriteJsonFileAsync(directory.Path, directorySupervisorData);
-            }
+                await this.hashDataManager.WriteJsonFileAsync(directory.Path, directorySupervisorData).ConfigureAwait(false);
 
-            logger.LogInformation("");
-            logger.LogInformation($"Found Paths: {patternMatchingResults.Count} file(s).");
-            foreach (var patternMatchingResultFile in patternMatchingResults)
-            {
-                logger.LogDebug($" - {patternMatchingResultFile}");
+                logger.LogInformation($"Directory path: '{directory.Path}' elapsed {directoryTimepiece.GetElapsedTime()}");
             }
         }
     }

@@ -2,6 +2,6 @@
 {
     internal interface IDirectoryHashBuilder
     {
-        string Build(string basePath, List<string> files);
+        Task<string> BuildAsync(string basePath, List<string> files);
     }
 }

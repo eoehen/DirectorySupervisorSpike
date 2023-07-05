@@ -22,11 +22,11 @@ namespace DirectorySupervisorSpike.App
                 .CreateLogger();                    // Initialise the logger
 
             var host = CreateDefaultBuilder().Build();
-            using var serviceScope = host.Services.CreateScope();
+            await using var serviceScope = host.Services.CreateAsyncScope();
             var provider = serviceScope.ServiceProvider;
             var workerInstance = provider.GetRequiredService<Worker>();
-            workerInstance.ExecuteAsync();
-            host.Run();
+            await workerInstance.ExecuteAsync();
+            await host.RunAsync();
         }
 
         static IHostBuilder CreateDefaultBuilder()
