@@ -2,7 +2,7 @@
 {
     internal interface IHashDataManager
     {
-        DirectorySupervisorData LoadJsonFile(string baseDirectory);
-        void WriteJsonFile(string baseDirectory, DirectorySupervisorData directorySupervisorData);
+        Task<DirectorySupervisorData> LoadJsonFileAsync(string baseDirectory);
+        Task WriteJsonFileAsync(string baseDirectory, DirectorySupervisorData directorySupervisorData);
     }
 }

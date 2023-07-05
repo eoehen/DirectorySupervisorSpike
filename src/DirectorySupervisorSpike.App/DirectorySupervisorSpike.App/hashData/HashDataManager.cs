@@ -9,14 +9,14 @@ namespace DirectorySupervisorSpike.App.hashData
         private static readonly JsonSerializerSettings jsonSerializerSettings
             = new() { NullValueHandling = NullValueHandling.Ignore, Formatting = Formatting.Indented };
 
-        public DirectorySupervisorData LoadJsonFile(string baseDirectory)
+        public async Task<DirectorySupervisorData> LoadJsonFileAsync(string baseDirectory)
         {
             var directorySupervisorDataFullPath = 
                 Path.Combine(baseDirectory, directorySupervisorDataFileName);
 
             if (!File.Exists(directorySupervisorDataFullPath))
             {
-                WriteJsonFile(baseDirectory, new DirectorySupervisorData());
+                await WriteJsonFileAsync(baseDirectory, new DirectorySupervisorData());
             }
 
             using var streamReader = new StreamReader(directorySupervisorDataFullPath);
@@ -24,12 +24,13 @@ namespace DirectorySupervisorSpike.App.hashData
             return JsonConvert.DeserializeObject<DirectorySupervisorData>(json) ?? new DirectorySupervisorData();
         }
 
-        public void WriteJsonFile(string baseDirectory, DirectorySupervisorData directorySupervisorData)
+        public async Task WriteJsonFileAsync(string baseDirectory, DirectorySupervisorData directorySupervisorData)
         {
             var directorySupervisorDataFullPath =
                 Path.Combine(baseDirectory, directorySupervisorDataFileName);
+
             var jsonString = JsonConvert.SerializeObject(directorySupervisorData, jsonSerializerSettings);
-            File.WriteAllText(directorySupervisorDataFullPath, jsonString);
+            await File.WriteAllTextAsync(directorySupervisorDataFullPath, jsonString);
         }
 
     }

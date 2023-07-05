@@ -4,6 +4,7 @@ using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Serilog.Core;
+using System.Formats.Asn1;
 
 namespace DirectorySupervisorSpike.App
 {
@@ -35,11 +36,11 @@ namespace DirectorySupervisorSpike.App
             var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
             while (await timer.WaitForNextTickAsync())
             {
-                SuperviseDirectory();
+                await SuperviseDirectoryAsync();
             }
         }
 
-        private void SuperviseDirectory()
+        private async Task SuperviseDirectoryAsync()
         {
             var options = directorySupervisorOptions?.Value;
             if (options == null) { return; }
@@ -62,7 +63,7 @@ namespace DirectorySupervisorSpike.App
 
                 logger.LogInformation($"Base directory path: '{directory.Path}'");
 
-                var directorySupervisorData = this.hashDataManager.LoadJsonFile(directory.Path);
+                var directorySupervisorData = await this.hashDataManager.LoadJsonFileAsync(directory.Path);
 
                 /* iterate first level of directories */
 
@@ -133,7 +134,7 @@ namespace DirectorySupervisorSpike.App
                     patternMatchingResults.AddRange(results);
                 }
 
-                this.hashDataManager.WriteJsonFile(directory.Path, directorySupervisorData);
+                await this.hashDataManager.WriteJsonFileAsync(directory.Path, directorySupervisorData);
             }
 
             logger.LogInformation("");
