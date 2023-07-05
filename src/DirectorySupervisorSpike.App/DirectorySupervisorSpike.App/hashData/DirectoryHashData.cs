@@ -2,7 +2,13 @@
 {
     public class DirectoryHashData
     {
-        public string? DirectoryName { get; set; }
+        public string DirectoryName { get; }
+
+        public DirectoryHashData(string directoryName)
+        {
+            DirectoryName = directoryName;
+        }
+
         public string? LastDirectoryHash { get; set; }
         public string? CurrentDirectoryHash { get; set; }
         public DateTime LastDirectoryHashDifferentSince { get; set; }

@@ -5,7 +5,7 @@ namespace DirectorySupervisorSpike.App
 {
     internal class DirectoryHashBuilder : IDirectoryHashBuilder
     {
-        public async Task<string> BuildAsync(string basePath, List<string> files)
+        public async Task<string> BuildDirectoryHashAsync(string directoryPath, List<string> files)
         {
             var md5 = MD5.Create();
 
@@ -14,7 +14,7 @@ namespace DirectorySupervisorSpike.App
                 var isLast = i == files.Count - 1;
                 var file = files[i];
 
-                await AppendHashFromFileAsync(basePath, md5, isLast, file)
+                await AppendHashFromFileAsync(directoryPath, md5, isLast, file)
                     .ConfigureAwait(false);
             }
 

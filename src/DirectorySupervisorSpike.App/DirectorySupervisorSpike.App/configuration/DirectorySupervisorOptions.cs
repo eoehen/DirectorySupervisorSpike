@@ -11,7 +11,12 @@
 
     internal class DirectorySupervisorDirOptions
     {
-        public string? Path { get; set; }
+        public string Path { get; }
+
+        public DirectorySupervisorDirOptions(string path)
+        {
+            Path = path;
+        }
 
         public List<string> IncludePatterns { get; } = new List<string>();
 

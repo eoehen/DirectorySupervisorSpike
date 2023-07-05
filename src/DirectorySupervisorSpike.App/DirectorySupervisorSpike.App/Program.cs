@@ -1,4 +1,5 @@
 ﻿using DirectorySupervisorSpike.App.configuration;
+using DirectorySupervisorSpike.App.filesystem;
 using DirectorySupervisorSpike.App.hashData;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,6 +43,7 @@ namespace DirectorySupervisorSpike.App
                     services.AddSingleton<Worker>();
                     services.AddSingleton<IDirectoryHashBuilder, DirectoryHashBuilder>();
                     services.AddSingleton<IHashDataManager, HashDataManager>();
+                    services.AddSingleton<IDirectoryParser, DirectoryParser>();
                 })
                 .UseSerilog()
                 ;
