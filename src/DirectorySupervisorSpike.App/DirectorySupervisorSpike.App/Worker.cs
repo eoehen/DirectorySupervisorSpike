@@ -32,14 +32,17 @@ namespace DirectorySupervisorSpike.App
             Console.WriteLine(FiggleFonts.Standard.Render("exanic"));
             Console.WriteLine(FiggleFonts.Standard.Render("DirectorySupervisor"));
 
-            await SuperviseDirectoryAsync(cancellationToken);
-            Console.WriteLine("... next check in 10 seconds.");
+            var options = directorySupervisorOptions?.Value;
+            if (options == null) { return; }
 
-            var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+            await SuperviseDirectoryAsync(cancellationToken);
+            Console.WriteLine($"... next check in {options.CheckIntervalSeconds} seconds.");
+
+            var timer = new PeriodicTimer(TimeSpan.FromSeconds(options.CheckIntervalSeconds));
             while (await timer.WaitForNextTickAsync(cancellationToken))
             {
                 await SuperviseDirectoryAsync();
-                Console.WriteLine("... next check in 10 seconds.");
+                Console.WriteLine($"... next check in {options.CheckIntervalSeconds} seconds.");
                 cancellationToken.ThrowIfCancellationRequested();
             }
         }

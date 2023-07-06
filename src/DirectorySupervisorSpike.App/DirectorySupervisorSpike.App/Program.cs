@@ -5,6 +5,7 @@ using DirectorySupervisorSpike.App.hashData;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using oehen.arguard;
 using Serilog;
 
 namespace DirectorySupervisorSpike.App
@@ -17,12 +18,6 @@ namespace DirectorySupervisorSpike.App
 
         static async Task Main(string[] args)
         {
-            Log.Logger = new LoggerConfiguration()  // initiate the logger configuration
-                .ReadFrom.AppSettings()             // Connect serilog to our configuration folder
-                .Enrich.FromLogContext()            // Adds more information to our logs from built in Serilog 
-                .WriteTo.Console()                  // Decide where the logs are going to be shown
-                .CreateLogger();                    // Initialise the logger
-
             var host = CreateDefaultBuilder().Build();
             await using var serviceScope = host.Services.CreateAsyncScope();
             var provider = serviceScope.ServiceProvider;
@@ -47,7 +42,14 @@ namespace DirectorySupervisorSpike.App
                     services.AddSingleton<IDirectoryParser, DirectoryParser>();
                     services.AddSingleton<ISstDirectoryHashCalculator, SstDirectoryHashCalculator>();
                 })
-                .UseSerilog()
+                .UseSerilog((hostingContext, loggingBuilder) =>
+                {
+                    loggingBuilder
+                        .Enrich.FromLogContext()
+                        .WriteTo.Console()
+                        .WriteTo.File("directorySupervisor.log", restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Warning, rollingInterval: RollingInterval.Day)
+                        .ReadFrom.Configuration(hostingContext.Configuration);
+                })
                 ;
         }
     }

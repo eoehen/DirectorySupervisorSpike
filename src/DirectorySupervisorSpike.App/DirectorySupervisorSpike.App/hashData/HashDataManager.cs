@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using DirectorySupervisorSpike.App.configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using oehen.arguard;
 
@@ -10,10 +12,14 @@ namespace DirectorySupervisorSpike.App.hashData
 
         private static readonly JsonSerializerSettings jsonSerializerSettings
             = new() { NullValueHandling = NullValueHandling.Ignore, Formatting = Formatting.Indented };
+        private readonly IOptions<DirectorySupervisorOptions> directorySupervisorOptions;
         private readonly ILogger<HashDataManager> logger;
 
-        public HashDataManager(ILogger<HashDataManager> logger)
+        public HashDataManager(
+            IOptions<DirectorySupervisorOptions> directorySupervisorOptions,
+            ILogger<HashDataManager> logger)
         {
+            this.directorySupervisorOptions = directorySupervisorOptions;
             this.logger = logger;
         }
 
@@ -70,17 +76,19 @@ namespace DirectorySupervisorSpike.App.hashData
 
             if (directoryHashData.CurrentDirectoryHash == null || !directoryHashData.LastDirectoryHash.Equals(directoryHashData.CurrentDirectoryHash))
             {
-                // No LastDirectoryHash change for 1 min
-                if (directoryHashData.LastDirectoryHashDifferentSince < DateTime.Now.AddMinutes(-1))
+                var options = directorySupervisorOptions?.Value;
+                if (options == null) { return; }
+
+                // No LastDirectoryHash change for n min
+                if (directoryHashData.LastDirectoryHashDifferentSince < DateTime.Now.AddMinutes(options.ChangeDetectionDelayMinutes*-1))
                 {
                     directoryHashData.CurrentDirectoryHash = directoryHashData.LastDirectoryHash;
                     directoryHashData.ImportPending = true;
 
-                    logger.LogError($"--> enque import {directoryHashData.DirectoryPath}");
+                    // TODO enqueue import!!
+                    logger.LogWarning($"--> enque import {directoryHashData.DirectoryPath}");
 
                     directoryHashData.ImportPending = false;
-
-                    // TODO enqueue import!!
                 }
             }
         }

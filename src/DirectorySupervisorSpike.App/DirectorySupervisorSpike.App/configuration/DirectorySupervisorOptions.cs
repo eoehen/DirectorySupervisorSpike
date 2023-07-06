@@ -2,6 +2,10 @@
 {
     internal class DirectorySupervisorOptions
     {
+        public int CheckIntervalSeconds { get; set; } = 10;
+
+        public int ChangeDetectionDelayMinutes { get; set; } = 1;
+
         public List<string> GlobalIncludePatterns { get; } = new List<string>();
 
         public List<string> GlobalExcludePatterns { get; } = new List<string>();
