@@ -8,35 +8,36 @@ namespace DirectorySupervisorSpike.App.hashData
 {
     internal class HashDataManager : IHashDataManager
     {
-        const string directorySupervisorDataFileName = "directorySupervisorData.json";
-
         private static readonly JsonSerializerSettings jsonSerializerSettings
             = new() { NullValueHandling = NullValueHandling.Ignore, Formatting = Formatting.Indented };
         private readonly IOptions<DirectorySupervisorOptions> directorySupervisorOptions;
+        private readonly IDirectoryHashDataFilePathBuilder directoryHashDataFilePathBuilder;
         private readonly ILogger<HashDataManager> logger;
 
         public HashDataManager(
             IOptions<DirectorySupervisorOptions> directorySupervisorOptions,
+            IDirectoryHashDataFilePathBuilder directoryHashDataFilePathBuilder,
             ILogger<HashDataManager> logger)
         {
             this.directorySupervisorOptions = directorySupervisorOptions;
+            this.directoryHashDataFilePathBuilder = directoryHashDataFilePathBuilder;
             this.logger = logger;
         }
 
-        public async Task<DirectorySupervisorData> LoadJsonFileAsync(string baseDirectory, CancellationToken cancellationToken = default)
+        public async Task<DirectorySupervisorData> LoadJsonFileAsync(DirectorySupervisorDirOptions directorySupervisorDirOptions, CancellationToken cancellationToken = default)
         {
-            var directorySupervisorDataFullPath =
-                Path.Combine(baseDirectory, directorySupervisorDataFileName);
+            var directorySupervisorDataFullPath = 
+                this.directoryHashDataFilePathBuilder.Build(directorySupervisorDirOptions);
 
             if (!File.Exists(directorySupervisorDataFullPath))
             {
-                await WriteJsonFileAsync(baseDirectory, new DirectorySupervisorData(), cancellationToken);
+                await WriteJsonFileAsync(directorySupervisorDirOptions, new DirectorySupervisorData(), cancellationToken);
             }
 
             var directorySupervisorData = ReadJsonFile(directorySupervisorDataFullPath);
 
-            SyncDirectories(baseDirectory, directorySupervisorData);
-            await WriteJsonFileAsync(baseDirectory, directorySupervisorData, cancellationToken);
+            SyncDirectories(directorySupervisorDirOptions, directorySupervisorData);
+            await WriteJsonFileAsync(directorySupervisorDirOptions, directorySupervisorData, cancellationToken);
 
             return directorySupervisorData;
         }
@@ -50,10 +51,10 @@ namespace DirectorySupervisorSpike.App.hashData
             return JsonConvert.DeserializeObject<DirectorySupervisorData>(json) ?? new DirectorySupervisorData();
         }
 
-        public async Task WriteJsonFileAsync(string baseDirectory, DirectorySupervisorData directorySupervisorData, CancellationToken cancellationToken = default)
+        public async Task WriteJsonFileAsync(DirectorySupervisorDirOptions directorySupervisorDirOptions, DirectorySupervisorData directorySupervisorData, CancellationToken cancellationToken = default)
         {
             var directorySupervisorDataFullPath =
-                Path.Combine(baseDirectory, directorySupervisorDataFileName);
+                this.directoryHashDataFilePathBuilder.Build(directorySupervisorDirOptions);
 
             var jsonString = JsonConvert.SerializeObject(directorySupervisorData, jsonSerializerSettings);
             await File.WriteAllTextAsync(directorySupervisorDataFullPath, jsonString, cancellationToken);
@@ -93,9 +94,18 @@ namespace DirectorySupervisorSpike.App.hashData
             }
         }
 
-        private void SyncDirectories(string baseDirectory, DirectorySupervisorData directorySupervisorData)
+        private void SyncDirectories(DirectorySupervisorDirOptions directorySupervisorDirOptions, DirectorySupervisorData directorySupervisorData)
         {
-            var sstDirectories = Directory.GetDirectories(baseDirectory).Where(d => Directory.Exists(d)).ToArray();
+            var directoryInfo = new DirectoryInfo(directorySupervisorDirOptions.Path);
+            var baseDirectory = directoryInfo.FullName;
+
+            var sstDirectories = new string[] { directorySupervisorDirOptions.Path };
+
+            if (directorySupervisorDirOptions.UseSubDirectories)
+            {
+                sstDirectories = Directory.GetDirectories(baseDirectory).Where(d => Directory.Exists(d)).ToArray();
+            }
+
             AppendMissingDirectories(directorySupervisorData, sstDirectories);
             RemoveNotExistingDirectories(directorySupervisorData, sstDirectories);
         }

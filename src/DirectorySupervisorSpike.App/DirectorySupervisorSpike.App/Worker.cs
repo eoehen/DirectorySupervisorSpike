@@ -62,7 +62,7 @@ namespace DirectorySupervisorSpike.App
                 var directoryTimepiece = Timepiece.StartNew();
 
                 var directorySupervisorData = await hashDataManager
-                    .LoadJsonFileAsync(directoryOptions.Path)
+                    .LoadJsonFileAsync(directoryOptions)
                     .ConfigureAwait(false);
 
                 foreach (var directoryHashData in directorySupervisorData.DirectoryHashDatas)
@@ -79,7 +79,7 @@ namespace DirectorySupervisorSpike.App
                     // Evaluate and update directory hash data
                     hashDataManager.EvaluateAndUpdateDirectoryHash(directoryHashData, sstDirectoryHash);
 
-                    await hashDataManager.WriteJsonFileAsync(directoryOptions.Path, directorySupervisorData, cancellationToken)
+                    await hashDataManager.WriteJsonFileAsync(directoryOptions, directorySupervisorData, cancellationToken)
                         .ConfigureAwait(false);
 
                     logger.LogDebug($"SST directory path: '{directoryHashData.DirectoryPath}' elapsed {sstDirTimepiece.GetElapsedTime()}");

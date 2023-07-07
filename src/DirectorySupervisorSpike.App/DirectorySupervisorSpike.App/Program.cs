@@ -41,6 +41,8 @@ namespace DirectorySupervisorSpike.App
                     services.AddSingleton<IHashDataManager, HashDataManager>();
                     services.AddSingleton<IDirectoryParser, DirectoryParser>();
                     services.AddSingleton<ISstDirectoryHashCalculator, SstDirectoryHashCalculator>();
+                    services.AddSingleton<IDirectoryHashDataFileNameBuilder, DirectoryHashDataFileNameBuilder>();
+                    services.AddSingleton<IDirectoryHashDataFilePathBuilder, DirectoryHashDataFilePathBuilder>();
                 })
                 .UseSerilog((hostingContext, loggingBuilder) =>
                 {

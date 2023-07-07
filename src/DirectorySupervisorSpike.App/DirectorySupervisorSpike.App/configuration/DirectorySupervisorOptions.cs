@@ -16,6 +16,7 @@
     internal class DirectorySupervisorDirOptions
     {
         public string Path { get; }
+        public bool UseSubDirectories { get; set; } = true;
 
         public DirectorySupervisorDirOptions(string path)
         {
