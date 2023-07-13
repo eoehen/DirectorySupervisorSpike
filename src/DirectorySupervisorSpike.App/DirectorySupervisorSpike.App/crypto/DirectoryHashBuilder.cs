@@ -24,6 +24,13 @@ namespace DirectorySupervisorSpike.App.crypto
 
             try
             {
+                //Parallel.For(0, files.Length,
+                //    index => {
+                //        FileInfo fi = new FileInfo(files[index]);
+                //        long size = fi.Length;
+                //        Interlocked.Add(ref totalSize, size);
+                //    });
+
                 for (int i = 0; i < files.Count; i++)
                 {
                     var isLast = i == files.Count - 1;
@@ -66,11 +73,20 @@ namespace DirectorySupervisorSpike.App.crypto
 
         private async Task AppendHashFromFileContentAsync(MD5 md5, string file, bool isLastFile, CancellationToken cancellationToken = default)
         {
-            var contentBytes = await ReadAllBytesAsync(file, cancellationToken).ConfigureAwait(false);
+            // var contentBytes = await ReadAllBytesAsync(file, cancellationToken).ConfigureAwait(false);
+            var contentBytes = ReadMetaDataBytes(file);
             if (isLastFile)
                 md5.TransformFinalBlock(contentBytes, 0, contentBytes.Length);
             else
                 md5.TransformBlock(contentBytes, 0, contentBytes.Length, contentBytes, 0);
+            await Task.CompletedTask;
+        }
+
+        private byte[] ReadMetaDataBytes(string fileName)
+        {
+            var fileInfo = new FileInfo(fileName);
+            var fileSizeBytes = fileInfo.Length;
+            return Encoding.UTF8.GetBytes(fileSizeBytes.ToString());
         }
 
         private async Task<byte[]> ReadAllBytesAsync(string fileName, CancellationToken cancellationToken = default)
