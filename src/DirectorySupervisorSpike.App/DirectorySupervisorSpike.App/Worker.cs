@@ -55,6 +55,10 @@ namespace DirectorySupervisorSpike.App
             var directories = options.Directories
                 .Where(x => !string.IsNullOrWhiteSpace(x.Path)).ToList();
 
+            long memory = GC.GetTotalMemory(true);
+            var kbMemory = memory > 0 ? memory / 1024 : 0;
+            logger.LogInformation($"current memory usage {kbMemory} kb.");
+
             foreach (var directoryOptions in directories)
             {
                 cancellationToken.ThrowIfCancellationRequested();

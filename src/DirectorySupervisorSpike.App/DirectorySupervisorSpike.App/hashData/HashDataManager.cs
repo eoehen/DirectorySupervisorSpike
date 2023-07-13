@@ -87,7 +87,7 @@ namespace DirectorySupervisorSpike.App.hashData
                     directoryHashData.ImportPending = true;
 
                     // TODO enqueue import!!
-                    logger.LogWarning($"--> enque import {directoryHashData.DirectoryPath}");
+                    logger.LogWarning($"--> enqueue import {directoryHashData.DirectoryPath}");
 
                     directoryHashData.ImportPending = false;
                 }

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Serilog.Core;
 using System.Security.Cryptography;
 using System.Text;
+using System;
 
 namespace DirectorySupervisorSpike.App.crypto
 {
@@ -19,19 +20,30 @@ namespace DirectorySupervisorSpike.App.crypto
         {
             var md5 = MD5.Create();
 
-            for (int i = 0; i < files.Count; i++)
-            {
-                var isLast = i == files.Count - 1;
-                var file = files[i];
+            logger.LogInformation($"Start calculating directory hash for '{directoryPath}' over {files.Count} files.");
 
-                await AppendHashFromFileAsync(directoryPath, md5, isLast, file, cancellationToken)
-                    .ConfigureAwait(false);
+            try
+            {
+                for (int i = 0; i < files.Count; i++)
+                {
+                    var isLast = i == files.Count - 1;
+                    var file = files[i];
+
+                    await AppendHashFromFileAsync(directoryPath, md5, isLast, file, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+
+                if (md5.Hash != null)
+                {
+                    return BitConverter.ToString(md5.Hash).Replace("-", "").ToLower();
+                }
+            }
+            catch (IOException iOException)
+            {
+                logger.LogWarning(iOException, $"Skip calculation directory hash for '{directoryPath}'.");
+                return string.Empty;
             }
 
-            if (md5.Hash != null)
-            {
-                return BitConverter.ToString(md5.Hash).Replace("-", "").ToLower();
-            }
             return string.Empty;
         }
 
@@ -63,24 +75,15 @@ namespace DirectorySupervisorSpike.App.crypto
 
         private async Task<byte[]> ReadAllBytesAsync(string fileName, CancellationToken cancellationToken = default)
         {
-            byte[] buffer = new byte[0];
+            byte[] buffer = Array.Empty<byte>();
             if (File.Exists(fileName))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                try
+                using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read))
                 {
-                    using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read))
-                    {
-                        buffer = new byte[fs.Length];
-                        _ = await fs.ReadAsync(buffer, 0, (int)fs.Length).ConfigureAwait(false);
-                    }
+                    buffer = new byte[fs.Length];
+                    _ = await fs.ReadAsync(buffer.AsMemory(0, (int)fs.Length), cancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception ex)
-                {
-                    this.logger.LogError(ex, "Read file error.");
-                    return new byte[0];
-                }
-
             }
             return buffer;
         }

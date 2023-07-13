@@ -23,10 +23,15 @@ namespace DirectorySupervisorSpike.App.filesystem
             List<string> directoryFiles = directoryParser
                 .ParseDirectoryFiles(directoryHashData.DirectoryPath, directoryOptions);
 
-            // Create hash for all files in directory
-            var sstDirectoryHash = await hashBuilder
-                .BuildDirectoryHashAsync(directoryHashData.DirectoryPath, directoryFiles)
-                .ConfigureAwait(false);
+            var sstDirectoryHash = string.Empty;
+
+            if (directoryFiles != null && directoryFiles.Any()) 
+            { 
+                // Create hash for all files in directory
+                sstDirectoryHash = await hashBuilder
+                    .BuildDirectoryHashAsync(directoryHashData.DirectoryPath, directoryFiles)
+                    .ConfigureAwait(false);
+            }
 
             return sstDirectoryHash;
         }
