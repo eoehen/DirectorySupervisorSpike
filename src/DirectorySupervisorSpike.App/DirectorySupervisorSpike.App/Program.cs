@@ -7,6 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using oehen.arguard;
 using Serilog;
+using Serilog.Filters;
+using Serilog.Formatting.Json;
 
 namespace DirectorySupervisorSpike.App
 {
@@ -49,7 +51,8 @@ namespace DirectorySupervisorSpike.App
                     loggingBuilder
                         .Enrich.FromLogContext()
                         .WriteTo.Console()
-                        .WriteTo.File("directorySupervisor.log", restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Warning, rollingInterval: RollingInterval.Day)
+                        .WriteTo.File("directorySupervisor.log", restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Debug, rollingInterval: RollingInterval.Day)
+                        .WriteTo.File("directorySupervisor-warn.log", restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Warning, rollingInterval: RollingInterval.Day)
                         .ReadFrom.Configuration(hostingContext.Configuration);
                 })
                 ;
